@@ -38,20 +38,54 @@ __all__ = ['ai_zeros', 'assoc_laguerre', 'bei_zeros', 'beip_zeros',
            'yn_zeros', 'ynp_zeros', 'yv', 'yvp', 'zeta']
 
 
-def _nonneg_int_or_fail(n, var_name, strict=True):
+def _integer_or_fail(n, var_name, strict=True):
+    """
+    Like `operator.index`, but includes the variable name in the message.
+
+    When strict=True, floats with integral values are forbidden, as they
+    are for list indexing.
+    """
     try:
-        if strict:
+        try:
             # Raises an exception if float
-            n = operator.index(n)
-        elif n == floor(n):
-            n = int(n)
+            return operator.index(n)
+        except TypeError:
+            if strict:
+                raise
+
+        if n == floor(n):
+            # TODO: deprecate this path
+            return int(n)
         else:
-            raise ValueError()
-        if n < 0:
+            raise ValueError
+    except (ValueError, TypeError) as err:
+        raise type(err)("{} must be an integer".format(var_name))
+
+
+def _integer_satisfying(n, var_name, cond, message, strict=True):
+    try:
+        n = _integer_or_fail(n, var_name, strict=strict)
+        if not cond(n):
             raise ValueError()
     except (ValueError, TypeError) as err:
-        raise err.__class__("{} must be a non-negative integer".format(var_name))
+        raise type(err)("{} {}".format(var_name, message))
     return n
+
+
+def _nonneg_int_or_fail(n, var_name, strict=True):
+    return _integer_satisfying(
+        n, var_name, lambda x: x >= 0,
+        "must be a non-negative integer",
+        strict=strict
+    )
+
+
+def _pos_int_or_fail(n, var_name, strict=True):
+    return _integer_satisfying(
+        n, var_name, lambda x: x > 0,
+        "must be a positive integer",
+        strict=strict
+    )
 
 
 def diric(x, n):
@@ -189,9 +223,8 @@ def jnjnp_zeros(nt):
            https://people.sc.fsu.edu/~jburkardt/f_src/special_functions/special_functions.html
 
     """
-    if not isscalar(nt) or (floor(nt) != nt) or (nt > 1200):
-        raise ValueError("Number must be integer <= 1200.")
-    nt = int(nt)
+    nt = _integer_satisfying(nt, "nt", lambda nt: nt <= 1200,
+        "must be an integer <= 1200.", strict=False)
     n, m, t, zo = specfun.jdzo(nt)
     return zo[1:nt+1], n[:nt], m[:nt], t[:nt]
 
@@ -218,12 +251,8 @@ def jnyn_zeros(n, nt):
            https://people.sc.fsu.edu/~jburkardt/f_src/special_functions/special_functions.html
 
     """
-    if not (isscalar(nt) and isscalar(n)):
-        raise ValueError("Arguments must be scalars.")
-    if (floor(n) != n) or (floor(nt) != nt):
-        raise ValueError("Arguments must be integers.")
-    if (nt <= 0):
-        raise ValueError("nt > 0")
+    nt = _pos_int_or_fail(nt, "nt", strict=False)
+    n = _integer_or_fail(n, "n", strict=True)
     return specfun.jyzo(abs(n), nt)
 
 
@@ -336,8 +365,8 @@ def y0_zeros(nt, complex=False):
            https://people.sc.fsu.edu/~jburkardt/f_src/special_functions/special_functions.html
 
     """
-    if not isscalar(nt) or (floor(nt) != nt) or (nt <= 0):
-        raise ValueError("Arguments must be scalar positive integer.")
+    nt = _pos_int_or_fail(nt, "nt", strict=False)
+    nt = _pos_int_or_fail(nt, "nt", strict=False)
     kf = 0
     kc = not complex
     return specfun.cyzo(nt, kf, kc)
@@ -372,8 +401,7 @@ def y1_zeros(nt, complex=False):
            https://people.sc.fsu.edu/~jburkardt/f_src/special_functions/special_functions.html
 
     """
-    if not isscalar(nt) or (floor(nt) != nt) or (nt <= 0):
-        raise ValueError("Arguments must be scalar positive integer.")
+    nt = _pos_int_or_fail(nt, "nt", strict=False)
     kf = 1
     kc = not complex
     return specfun.cyzo(nt, kf, kc)
@@ -408,8 +436,7 @@ def y1p_zeros(nt, complex=False):
            https://people.sc.fsu.edu/~jburkardt/f_src/special_functions/special_functions.html
 
     """
-    if not isscalar(nt) or (floor(nt) != nt) or (nt <= 0):
-        raise ValueError("Arguments must be scalar positive integer.")
+    nt = _pos_int_or_fail(nt, "nt", strict=False)
     kf = 2
     kc = not complex
     return specfun.cyzo(nt, kf, kc)
@@ -690,8 +717,8 @@ def riccati_jn(n, x):
            https://dlmf.nist.gov/10.51.E1
 
     """
-    if not (isscalar(n) and isscalar(x)):
-        raise ValueError("arguments must be scalars.")
+    if not isscalar(x):
+        raise ValueError("x must be a scalar.")
     n = _nonneg_int_or_fail(n, 'n', strict=False)
     if (n == 0):
         n1 = 1
@@ -742,8 +769,8 @@ def riccati_yn(n, x):
            https://dlmf.nist.gov/10.51.E1
 
     """
-    if not (isscalar(n) and isscalar(x)):
-        raise ValueError("arguments must be scalars.")
+    if not isscalar(x):
+        raise ValueError("x must be a scalar.")
     n = _nonneg_int_or_fail(n, 'n', strict=False)
     if (n == 0):
         n1 = 1
@@ -775,8 +802,7 @@ def erf_zeros(nt):
            https://people.sc.fsu.edu/~jburkardt/f_src/special_functions/special_functions.html
 
     """
-    if (floor(nt) != nt) or (nt <= 0) or not isscalar(nt):
-        raise ValueError("Argument must be positive scalar integer.")
+    nt = _pos_int_or_fail(nt, "nt", strict=False)
     return specfun.cerzo(nt)
 
 
@@ -790,8 +816,7 @@ def fresnelc_zeros(nt):
            https://people.sc.fsu.edu/~jburkardt/f_src/special_functions/special_functions.html
 
     """
-    if (floor(nt) != nt) or (nt <= 0) or not isscalar(nt):
-        raise ValueError("Argument must be positive scalar integer.")
+    nt = _pos_int_or_fail(nt, "nt", strict=False)
     return specfun.fcszo(1, nt)
 
 
@@ -805,8 +830,7 @@ def fresnels_zeros(nt):
            https://people.sc.fsu.edu/~jburkardt/f_src/special_functions/special_functions.html
 
     """
-    if (floor(nt) != nt) or (nt <= 0) or not isscalar(nt):
-        raise ValueError("Argument must be positive scalar integer.")
+    nt = _pos_int_or_fail(nt, "nt", strict=False)
     return specfun.fcszo(2, nt)
 
 
@@ -820,8 +844,7 @@ def fresnel_zeros(nt):
            https://people.sc.fsu.edu/~jburkardt/f_src/special_functions/special_functions.html
 
     """
-    if (floor(nt) != nt) or (nt <= 0) or not isscalar(nt):
-        raise ValueError("Argument must be positive scalar integer.")
+    nt = _pos_int_or_fail(nt, "nt", strict=False)
     return specfun.fcszo(2, nt), specfun.fcszo(1, nt)
 
 
@@ -910,12 +933,8 @@ def mathieu_even_coef(m, q):
            https://dlmf.nist.gov/28.4#i
 
     """
-    if not (isscalar(m) and isscalar(q)):
-        raise ValueError("m and q must be scalars.")
-    if (q < 0):
-        raise ValueError("q >=0")
-    if (m != floor(m)) or (m < 0):
-        raise ValueError("m must be an integer >=0.")
+    m = _nonneg_int_or_fail(m, 'm', strict=False)
+    q = _pos_int_or_fail(q, 'q', strict=False)
 
     if (q <= 1):
         qm = 7.5 + 56.1*sqrt(q) - 134.7*q + 90.7*sqrt(q)*q
@@ -925,7 +944,6 @@ def mathieu_even_coef(m, q):
     if km > 251:
         print("Warning, too many predicted coefficients.")
     kd = 1
-    m = int(floor(m))
     if m % 2:
         kd = 2
 
@@ -967,12 +985,8 @@ def mathieu_odd_coef(m, q):
            https://people.sc.fsu.edu/~jburkardt/f_src/special_functions/special_functions.html
 
     """
-    if not (isscalar(m) and isscalar(q)):
-        raise ValueError("m and q must be scalars.")
-    if (q < 0):
-        raise ValueError("q >=0")
-    if (m != floor(m)) or (m <= 0):
-        raise ValueError("m must be an integer > 0")
+    m = _nonneg_int_or_fail(m, 'm', strict=False)
+    q = _pos_int_or_fail(q, 'q', strict=False)
 
     if (q <= 1):
         qm = 7.5 + 56.1*sqrt(q) - 134.7*q + 90.7*sqrt(q)*q
@@ -982,7 +996,6 @@ def mathieu_odd_coef(m, q):
     if km > 251:
         print("Warning, too many predicted coefficients.")
     kd = 4
-    m = int(floor(m))
     if m % 2:
         kd = 3
 
@@ -1041,8 +1054,7 @@ def lpmn(m, n, z):
     """
     if not isscalar(m) or (abs(m) > n):
         raise ValueError("m must be <= n.")
-    if not isscalar(n) or (n < 0):
-        raise ValueError("n must be a non-negative integer.")
+    n = _nonneg_int_or_fail(n, 'n', strict=False)
     if not isscalar(z):
         raise ValueError("z must be scalar.")
     if iscomplex(z):
@@ -1124,8 +1136,7 @@ def clpmn(m, n, z, type=3):
     """
     if not isscalar(m) or (abs(m) > n):
         raise ValueError("m must be <= n.")
-    if not isscalar(n) or (n < 0):
-        raise ValueError("n must be a non-negative integer.")
+    n = _nonneg_int_or_fail(n, 'n', strict=False)
     if not isscalar(z):
         raise ValueError("z must be scalar.")
     if not(type == 2 or type == 3):
@@ -1181,14 +1192,10 @@ def lqmn(m, n, z):
            https://people.sc.fsu.edu/~jburkardt/f_src/special_functions/special_functions.html
 
     """
-    if not isscalar(m) or (m < 0):
-        raise ValueError("m must be a non-negative integer.")
-    if not isscalar(n) or (n < 0):
-        raise ValueError("n must be a non-negative integer.")
+    m = _nonneg_int_or_fail(m, 'm', strict=False)
+    n = _nonneg_int_or_fail(n, 'n', strict=False)
     if not isscalar(z):
         raise ValueError("z must be scalar.")
-    m = int(m)
-    n = int(n)
 
     # Ensure neither m nor n == 0
     mm = max(1, m)
@@ -1211,14 +1218,12 @@ def bernoulli(n):
            https://people.sc.fsu.edu/~jburkardt/f_src/special_functions/special_functions.html
 
     """
-    if not isscalar(n) or (n < 0):
-        raise ValueError("n must be a non-negative integer.")
-    n = int(n)
+    n = _nonneg_int_or_fail(n, 'n', strict=False)
     if (n < 2):
         n1 = 2
     else:
         n1 = n
-    return specfun.bernob(int(n1))[:(n+1)]
+    return specfun.bernob(n1)[:(n+1)]
 
 
 def euler(n):
@@ -1262,9 +1267,8 @@ def euler(n):
     -69348874393137976.0
 
     """
-    if not isscalar(n) or (n < 0):
-        raise ValueError("n must be a non-negative integer.")
-    n = int(n)
+
+    n = _nonneg_int_or_fail(n, 'n', strict=False)
     if (n < 2):
         n1 = 2
     else:
@@ -1287,8 +1291,8 @@ def lpn(n, z):
            https://people.sc.fsu.edu/~jburkardt/f_src/special_functions/special_functions.html
 
     """
-    if not (isscalar(n) and isscalar(z)):
-        raise ValueError("arguments must be scalars.")
+    if not isscalar(z):
+        raise ValueError("z must be a scalar.")
     n = _nonneg_int_or_fail(n, 'n', strict=False)
     if (n < 1):
         n1 = 1
@@ -1314,7 +1318,7 @@ def lqn(n, z):
            https://people.sc.fsu.edu/~jburkardt/f_src/special_functions/special_functions.html
 
     """
-    if not (isscalar(n) and isscalar(z)):
+    if not isscalar(z):
         raise ValueError("arguments must be scalars.")
     n = _nonneg_int_or_fail(n, 'n', strict=False)
     if (n < 1):
@@ -1361,8 +1365,7 @@ def ai_zeros(nt):
 
     """
     kf = 1
-    if not isscalar(nt) or (floor(nt) != nt) or (nt <= 0):
-        raise ValueError("nt must be a positive integer scalar.")
+    nt = _pos_int_or_fail(nt, "nt", strict=False)
     return specfun.airyzo(nt, kf)
 
 
@@ -1399,8 +1402,7 @@ def bi_zeros(nt):
 
     """
     kf = 2
-    if not isscalar(nt) or (floor(nt) != nt) or (nt <= 0):
-        raise ValueError("nt must be a positive integer scalar.")
+    nt = _pos_int_or_fail(nt, "nt", strict=False)
     return specfun.airyzo(nt, kf)
 
 
@@ -1574,8 +1576,7 @@ def ber_zeros(nt):
            https://people.sc.fsu.edu/~jburkardt/f_src/special_functions/special_functions.html
 
     """
-    if not isscalar(nt) or (floor(nt) != nt) or (nt <= 0):
-        raise ValueError("nt must be positive integer scalar.")
+    nt = _pos_int_or_fail(nt, "nt", strict=False)
     return specfun.klvnzo(nt, 1)
 
 
@@ -1589,8 +1590,7 @@ def bei_zeros(nt):
            https://people.sc.fsu.edu/~jburkardt/f_src/special_functions/special_functions.html
 
     """
-    if not isscalar(nt) or (floor(nt) != nt) or (nt <= 0):
-        raise ValueError("nt must be positive integer scalar.")
+    nt = _pos_int_or_fail(nt, "nt", strict=False)
     return specfun.klvnzo(nt, 2)
 
 
@@ -1604,16 +1604,14 @@ def ker_zeros(nt):
            https://people.sc.fsu.edu/~jburkardt/f_src/special_functions/special_functions.html
 
     """
-    if not isscalar(nt) or (floor(nt) != nt) or (nt <= 0):
-        raise ValueError("nt must be positive integer scalar.")
+    nt = _pos_int_or_fail(nt, "nt", strict=False)
     return specfun.klvnzo(nt, 3)
 
 
 def kei_zeros(nt):
     """Compute nt zeros of the Kelvin function kei(x).
     """
-    if not isscalar(nt) or (floor(nt) != nt) or (nt <= 0):
-        raise ValueError("nt must be positive integer scalar.")
+    nt = _pos_int_or_fail(nt, "nt", strict=False)
     return specfun.klvnzo(nt, 4)
 
 
@@ -1627,8 +1625,7 @@ def berp_zeros(nt):
            https://people.sc.fsu.edu/~jburkardt/f_src/special_functions/special_functions.html
 
     """
-    if not isscalar(nt) or (floor(nt) != nt) or (nt <= 0):
-        raise ValueError("nt must be positive integer scalar.")
+    nt = _pos_int_or_fail(nt, "nt", strict=False)
     return specfun.klvnzo(nt, 5)
 
 
@@ -1642,8 +1639,7 @@ def beip_zeros(nt):
            https://people.sc.fsu.edu/~jburkardt/f_src/special_functions/special_functions.html
 
     """
-    if not isscalar(nt) or (floor(nt) != nt) or (nt <= 0):
-        raise ValueError("nt must be positive integer scalar.")
+    nt = _pos_int_or_fail(nt, "nt", strict=False)
     return specfun.klvnzo(nt, 6)
 
 
@@ -1657,8 +1653,7 @@ def kerp_zeros(nt):
            https://people.sc.fsu.edu/~jburkardt/f_src/special_functions/special_functions.html
 
     """
-    if not isscalar(nt) or (floor(nt) != nt) or (nt <= 0):
-        raise ValueError("nt must be positive integer scalar.")
+    nt = _pos_int_or_fail(nt, "nt", strict=False)
     return specfun.klvnzo(nt, 7)
 
 
@@ -1672,8 +1667,7 @@ def keip_zeros(nt):
            https://people.sc.fsu.edu/~jburkardt/f_src/special_functions/special_functions.html
 
     """
-    if not isscalar(nt) or (floor(nt) != nt) or (nt <= 0):
-        raise ValueError("nt must be positive integer scalar.")
+    nt = _pos_int_or_fail(nt, "nt", strict=False)
     return specfun.klvnzo(nt, 8)
 
 
@@ -1690,8 +1684,7 @@ def kelvin_zeros(nt):
            https://people.sc.fsu.edu/~jburkardt/f_src/special_functions/special_functions.html
 
     """
-    if not isscalar(nt) or (floor(nt) != nt) or (nt <= 0):
-        raise ValueError("nt must be positive integer scalar.")
+    nt = _pos_int_or_fail(nt, "nt", strict=False)
     return (specfun.klvnzo(nt, 1),
             specfun.klvnzo(nt, 2),
             specfun.klvnzo(nt, 3),
@@ -1716,10 +1709,10 @@ def pro_cv_seq(m, n, c):
            https://people.sc.fsu.edu/~jburkardt/f_src/special_functions/special_functions.html
 
     """
-    if not (isscalar(m) and isscalar(n) and isscalar(c)):
-        raise ValueError("Arguments must be scalars.")
-    if (n != floor(n)) or (m != floor(m)):
-        raise ValueError("Modes must be integers.")
+    n = _integer_or_fail(n, "n", strict=False)
+    m = _integer_or_fail(m, "m", strict=False)
+    if not isscalar(c):
+        raise ValueError("c must be a scalar.")
     if (n-m > 199):
         raise ValueError("Difference between n and m is too large.")
     maxL = n-m+1
@@ -1740,10 +1733,10 @@ def obl_cv_seq(m, n, c):
            https://people.sc.fsu.edu/~jburkardt/f_src/special_functions/special_functions.html
 
     """
-    if not (isscalar(m) and isscalar(n) and isscalar(c)):
-        raise ValueError("Arguments must be scalars.")
-    if (n != floor(n)) or (m != floor(m)):
-        raise ValueError("Modes must be integers.")
+    n = _integer_or_fail(n, "n", strict=False)
+    m = _integer_or_fail(m, "m", strict=False)
+    if not isscalar(c):
+        raise ValueError("c must be a scalar.")
     if (n-m > 199):
         raise ValueError("Difference between n and m is too large.")
     maxL = n-m+1
